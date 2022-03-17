@@ -52,15 +52,22 @@ async fn my_custom_command(
 
     // search
     0 => unsafe {
-      let arc = IDX_STORE.clone().unwrap();
-      if kw.eq("") {
-        kw = "*".to_string();
+      if IDX_STORE.is_none() {
+        Ok(CustomResponse {
+          message: "".to_string(),
+          file_views: vec![],
+        })
+      } else {
+        let arc = IDX_STORE.clone().unwrap();
+        if kw.eq("") {
+          kw = "*".to_string();
+        }
+        let vec = arc.search(kw, 100);
+        Ok(CustomResponse {
+          message: "".to_string(),
+          file_views: vec,
+        })
       }
-      let vec = arc.search(kw, 100);
-      Ok(CustomResponse {
-        message: "".to_string(),
-        file_views: vec,
-      })
     },
     // suggest
     2 => unsafe {
@@ -89,6 +96,8 @@ async fn my_custom_command(
 }
 
 fn main() {
+  utils::init_log();
+
   std::thread::spawn(|| {
     std::thread::sleep(Duration::from_secs(1));
     indexing::run();

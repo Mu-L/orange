@@ -1,6 +1,13 @@
 use directories::ProjectDirs;
+#[cfg(windows)]
 use std::ffi::CString;
-use std::time::SystemTime;
+extern crate chrono;
+use chrono::Local;
+use log::LevelFilter;
+use log4rs::append::console::ConsoleAppender;
+use log4rs::append::file::FileAppender;
+use log4rs::config::{Appender, Config, Logger, Root};
+use log4rs::encode::pattern::PatternEncoder;
 
 pub fn subs(str: &str) -> Vec<String> {
   if let Ok(paths) = std::fs::read_dir(str) {
@@ -13,15 +20,11 @@ pub fn subs(str: &str) -> Vec<String> {
 }
 pub fn open_file_path(path: &str) {
   let curr_path = std::path::Path::new(path);
-  let arg ;
+  let arg;
   if curr_path.is_dir() {
     arg = curr_path.to_str().unwrap();
-  }else {
-    arg=curr_path
-        .parent()
-        .unwrap()
-        .to_str()
-        .unwrap();
+  } else {
+    arg = curr_path.parent().unwrap().to_str().unwrap();
   }
 
   if cfg!(target_os = "windows") {
@@ -45,35 +48,39 @@ pub fn open_file_path(path: &str) {
 
 pub fn open_file_path_in_terminal(path: &str) {
   let curr_path = std::path::Path::new(path);
-  let arg ;
+  let arg;
   if curr_path.is_dir() {
     arg = curr_path.to_str().unwrap();
-  }else {
-    arg=curr_path
-        .parent()
-        .unwrap()
-        .to_str()
-        .unwrap();
+  } else {
+    arg = curr_path.parent().unwrap().to_str().unwrap();
   }
 
   if cfg!(target_os = "windows") {
     //cmd /K "cd C:\Windows\"
     std::process::Command::new("cmd")
-        .args(["/K","pushd","\"",&win_norm4explorer(arg),"\""])
-        .output()
-        .expect("failed to execute process");
+      .args([
+        "/c",
+        "start",
+        "cmd",
+        "/K",
+        "pushd",
+        &format!("{}", win_norm4explorer(arg)),
+      ])
+      .output()
+      .expect("failed to execute process");
   } else if cfg!(target_os = "linux") {
-    std::process::Command::new("xdg-open")
-        .args([arg])
-        .output()
-        .expect("failed to execute process");
+    // gnome-terminal -e "bash -c command;bash"
+    std::process::Command::new("gnome-terminal")
+      .args(["-e", &format!("bash -c 'cd {}';bash", arg)])
+      .output()
+      .expect("failed to execute process");
   } else {
     //mac os
     //open -a Terminal "/Library"
     std::process::Command::new("open")
-        .args(["-a","Terminal",arg])
-        .output()
-        .expect("failed to execute process");
+      .args(["-a", "Terminal", arg])
+      .output()
+      .expect("failed to execute process");
   }
 }
 
@@ -83,13 +90,13 @@ pub fn data_dir() -> String {
   project_dir.data_dir().to_str().unwrap().to_string()
 }
 
-pub fn parse_ts(time: SystemTime) -> u64 {
-  let created_at = time
-    .duration_since(SystemTime::UNIX_EPOCH)
-    .unwrap()
-    .as_secs() as u64;
-  created_at
-}
+// pub fn parse_ts(time: SystemTime) -> u64 {
+//   let created_at = time
+//     .duration_since(SystemTime::UNIX_EPOCH)
+//     .unwrap()
+//     .as_secs() as u64;
+//   created_at
+// }
 pub fn path2name(x: String) -> Option<String> {
   x.as_str()
     .split("/")
@@ -100,6 +107,11 @@ pub fn path2name(x: String) -> Option<String> {
 
 pub fn norm(path: &str) -> String {
   str::replace(path, "\\", "/")
+}
+
+pub fn today() -> String {
+  let date = Local::now();
+  date.format("%Y-%m-%d").to_string()
 }
 
 pub fn win_norm4explorer(path: &str) -> String {
@@ -130,6 +142,32 @@ pub unsafe fn get_win32_ready_drives() -> Vec<String> {
 
 pub fn is_ascii_alphanumeric(raw: &str) -> bool {
   raw.chars().all(|x| x.is_ascii())
+}
+
+pub fn init_log() {
+  let stdout = ConsoleAppender::builder()
+    .encoder(Box::new(PatternEncoder::new("{d} - {l} -{t} - {m}{n}")))
+    .build();
+
+  let file = FileAppender::builder()
+    .encoder(Box::new(PatternEncoder::new("{d} - {l} - {t} - {m}{n}")))
+    .build(format!("{}/log/{}.log", data_dir(), today()))
+    .unwrap();
+
+  let config = Config::builder()
+    .appender(Appender::builder().build("stdout", Box::new(stdout)))
+    .appender(Appender::builder().build("file", Box::new(file)))
+    .logger(
+      Logger::builder()
+        .appender("file")
+        .appender("stdout")
+        .additive(false)
+        .build("app", LevelFilter::Info),
+    )
+    .build(Root::builder().appender("stdout").build(LevelFilter::Error))
+    .unwrap();
+
+  let _ = log4rs::init_config(config).unwrap();
 }
 
 #[cfg(windows)]
@@ -169,9 +207,10 @@ fn t3() {
 
 #[test]
 fn t4() {
-  let u: Vec<i32> = vec![1, 2, 3];
-  let x1 = u.iter().map(|&x| x + 2).collect::<Vec<_>>();
-  println!("{:?}", x1);
-  // let v = u.iter().map(|&x| x + 1).collect::<Vec<_>>();
-  // println!("{:?}", v);
+  open_file_path_in_terminal("/home/jeff/CLionProjects/orange")
+  // use std::process::Command;
+  // Command::new("cmd")
+  //     .args(&["/c", "start", "cmd"])
+  //     .spawn()
+  //     .unwrap();
 }
